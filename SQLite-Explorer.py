@@ -4,6 +4,7 @@
 import os
 import sys
 import sqlite3
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
@@ -11,10 +12,40 @@ import customtkinter as ctk
 ctk.set_appearance_mode("system")
 ctk.set_default_color_theme("blue")
 
+class ToolTip:
+    """Einfacher, robuster Tooltip für Tkinter/CustomTkinter Widgets"""
+    def __init__(self, widget, text_func):
+        self.widget = widget
+        self.text_func = text_func
+        self.tipwindow = None
+        widget.bind("<Enter>", self.show_tip)
+        widget.bind("<Leave>", self.hide_tip)
+
+    def show_tip(self, event=None):
+        if self.tipwindow:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        
+        label = tk.Label(tw, text=self.text_func(), justify=tk.LEFT,
+                         background="#2d2f34", foreground="#f5f7fa", 
+                         relief=tk.SOLID, borderwidth=1,
+                         font=("Segoe UI", 10), padx=8, pady=6)
+        label.pack(ipadx=1)
+
+    def hide_tip(self, event=None):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+
 class SQLiteViewer(ctk.CTk):
     ROW_HEIGHT = 35  
-    HEADER_TOP = 35  # Etwas mehr Platz für die größere Schrift
-    HEADER_HEIGHT = 70  # Gesamthöhe des Headers angepasst
+    HEADER_TOP = 35  
+    HEADER_HEIGHT = 70  
     CHECKBOX_WIDTH = 48
     MIN_COL_WIDTH = 85
     MAX_COL_WIDTH = 500
@@ -72,7 +103,24 @@ class SQLiteViewer(ctk.CTk):
                 "selection_info": "Zeilen: {rows}   Spalten: {cols}/{total_cols}",
                 "status_selection": "Auswahl: {vals} Werte ({rows} Zeilen × {cols} Spalten)",
                 "status_ready": "Bereit", "status_nodb": "Keine Datenbank geöffnet",
-                "search_ph": "Suche", "reset_filter": "↺ Filter zurücksetzen"
+                "search_ph": "Suche", "reset_filter": "↺ Filter zurücksetzen",
+                "regex_lbl": "Regex",
+                "regex_tooltip": "Regex-Hilfe anzeigen (Klicken für Details)",
+                "regex_dialog_title": "Reguläre Ausdrücke (Regex) - Hilfe & Referenz",
+                "regex_dialog_desc": (
+                    "Hier ist eine Übersicht wichtiger regulärer Ausdrücke, die du in der Suche\n"
+                    "und in den Spaltenfiltern verwenden kannst:\n\n"
+                    "• text        - Sucht nach dem exakten Wort 'text'\n"
+                    "• ^text       - Findet Einträge, die mit 'text' BEGINNEN\n"
+                    "• text$       - Findet Einträge, die mit 'text' ENDEN\n"
+                    "• \\d+        - Findet eine oder mehrere Ziffern (Zahlen)\n"
+                    "• ^\\d{4}$    - Exakt 4-stellige Zahlen (z. B. Jahre)\n"
+                    "• cat|dog     - Entweder 'cat' ODER 'dog'\n"
+                    "• .           - Steht für ein beliebiges einzelnes Zeichen\n"
+                    "• [A-Z]       - Findet jeden Großbuchstaben von A bis Z\n\n"
+                    "Hinweis: Die Suche ist standardmäßig Groß-/Kleinschreibung-unabhängig (Case-Insensitive)."
+                ),
+                "close_btn": "Schließen"
             },
             "EN": {
                 "open_db": "📂 Open Database", "open_sql": "📄 Open SQL Dump",
@@ -93,7 +141,24 @@ class SQLiteViewer(ctk.CTk):
                 "selection_info": "Rows: {rows}   Columns: {cols}/{total_cols}",
                 "status_selection": "Selection: {vals} values ({rows} rows × {cols} columns)",
                 "status_ready": "Ready", "status_nodb": "No database opened",
-                "search_ph": "Search", "reset_filter": "↺ Reset Filter"
+                "search_ph": "Search", "reset_filter": "↺ Reset Filter",
+                "regex_lbl": "Regex",
+                "regex_tooltip": "Show Regex Help (Click for details)",
+                "regex_dialog_title": "Regular Expressions (Regex) - Help & Reference",
+                "regex_dialog_desc": (
+                    "Here is an overview of useful regular expressions you can use in the\n"
+                    "global search and column filters:\n\n"
+                    "• text        - Searches for the exact word 'text'\n"
+                    "• ^text       - Finds entries starting with 'text'\n"
+                    "• text$       - Finds entries ending with 'text'\n"
+                    "• \\d+        - Finds one or more digits (numbers)\n"
+                    "• ^\\d{4}$    - Exactly 4-digit numbers (e.g. years)\n"
+                    "• cat|dog     - Either 'cat' OR 'dog'\n"
+                    "• .           - Any single character\n"
+                    "• [A-Z]       - Any uppercase letter from A to Z\n\n"
+                    "Note: Search and filtering are case-insensitive by default."
+                ),
+                "close_btn": "Close"
             }
         }
         self.resize_column, self.resize_start_x, self.resize_start_width, self.resize_guide = None, None, None, None
@@ -105,6 +170,19 @@ class SQLiteViewer(ctk.CTk):
     def _get_txt(self, key, **kwargs):
         text = self.translations[self.current_lang].get(key, "")
         return text.format(**kwargs) if kwargs else text
+
+    def _sqlite_regexp(self, expr, item):
+        if item is None:
+            return False
+        try:
+            is_regex_on = self.regex_switch.get() == 1 if hasattr(self, 'regex_switch') else False
+            
+            if is_regex_on:
+                return bool(re.search(expr, str(item), re.IGNORECASE))
+            else:
+                return expr.lower() in str(item).lower()
+        except Exception:
+            return False
 
     def _build_ui(self):
         self.toolbar = ctk.CTkFrame(self, corner_radius=0)
@@ -155,6 +233,17 @@ class SQLiteViewer(ctk.CTk):
         self.btn_reset_filter = ctk.CTkButton(self.selection_bar, text=self._get_txt("reset_filter"), command=self.reset_all_filters, fg_color=("#e0e0e0", "#3a3a3a"), text_color=("#1a1a1a", "#ffffff"), border_width=1, border_color=("#b0b0b0", "#555555"), width=130)
         self.btn_reset_filter.pack(side="left", padx=5, pady=6)
 
+        # Regex On/Off Schalter (mit Türkis als Akzentfarbe)
+        self.regex_switch = ctk.CTkSwitch(self.selection_bar, text=self._get_txt("regex_lbl"), command=self._on_regex_toggle, width=70, progress_color=self.accent_color, button_color=("#ffffff", "#e0e0e0"), button_hover_color=self.accent_hover)
+        self.regex_switch.pack(side="left", padx=(10, 5), pady=6)
+        self.regex_switch.select()
+
+        # Info Icon für Regex Erklärung (klickbar + Tooltip)
+        self.lbl_regex_info = ctk.CTkLabel(self.selection_bar, text=" ⓘ ", font=("Segoe UI", 13, "bold"), text_color=self.accent_color, cursor="arrow")
+        self.lbl_regex_info.pack(side="left", padx=(0, 5), pady=6)
+        ToolTip(self.lbl_regex_info, lambda: self._get_txt("regex_tooltip"))
+        self.lbl_regex_info.bind("<Button-1>", lambda e: self._show_regex_help_dialog())
+
         self.selection_info = tk.StringVar(value="")
         self.lbl_sel_info = ctk.CTkLabel(self.selection_bar, textvariable=self.selection_info)
         self.lbl_sel_info.pack(side="right", padx=15)
@@ -201,6 +290,27 @@ class SQLiteViewer(ctk.CTk):
 
         self._apply_search_placeholder()
 
+    def _show_regex_help_dialog(self):
+        """Öffnet ein Pop-up-Fenster mit der vollständigen Regex-Erklärung"""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(self._get_txt("regex_dialog_title"))
+        dialog.geometry("520x420")
+        dialog.minsize(480, 380)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Zentrieren zum Hauptfenster
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        lbl = ctk.CTkLabel(dialog, text=self._get_txt("regex_dialog_desc"), justify=tk.LEFT, font=("Segoe UI", 12))
+        lbl.pack(padx=20, pady=(20, 15), anchor="w")
+
+        btn_close = ctk.CTkButton(dialog, text=self._get_txt("close_btn"), command=dialog.destroy, fg_color=self.accent_color, hover_color=self.accent_hover, width=120)
+        btn_close.pack(pady=(0, 20))
+
     def _apply_search_placeholder(self):
         ph = self._get_txt("search_ph")
         self.is_search_placeholder_active = True
@@ -227,6 +337,10 @@ class SQLiteViewer(ctk.CTk):
             return
         self._refresh_view()
 
+    def _on_regex_toggle(self):
+        if self.columns:
+            self._refresh_view()
+
     def toggle_appearance_mode(self):
         if ctk.get_appearance_mode() == "Light":
             ctk.set_appearance_mode("Dark")
@@ -245,6 +359,7 @@ class SQLiteViewer(ctk.CTk):
         self.btn_copy_sel.configure(text=self._get_txt("copy_sel"))
         self.btn_export_sel.configure(text=self._get_txt("export_sel"))
         self.btn_reset_filter.configure(text=self._get_txt("reset_filter"))
+        self.regex_switch.configure(text=self._get_txt("regex_lbl"))
         
         chk_r = "☑" if self.selected_row_ids else "☐"
         chk_c = "☑" if self.selected_columns else "☐"
@@ -285,6 +400,7 @@ class SQLiteViewer(ctk.CTk):
             if self.conn: self.conn.close()
             uri = "file:" + os.path.abspath(path).replace("\\", "/") + "?mode=ro"
             self.conn = sqlite3.connect(uri, uri=True)
+            self.conn.create_function("REGEXP", 2, self._sqlite_regexp)
             self.db_path = path
             self._load_tables()
             self.status_var.set(f"{os.path.basename(path)}")
@@ -296,6 +412,7 @@ class SQLiteViewer(ctk.CTk):
         try:
             if self.conn: self.conn.close()
             self.conn = sqlite3.connect(":memory:")
+            self.conn.create_function("REGEXP", 2, self._sqlite_regexp)
             with open(path, "rb") as f: raw = f.read()
             script = None
             for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
@@ -377,15 +494,15 @@ class SQLiteViewer(ctk.CTk):
         for i, var in enumerate(self.filter_vars):
             val = var.get().strip()
             if val:
-                clauses.append(f'CAST("{self.columns[i]}" AS TEXT) LIKE ?')
-                params.append(f"%{val}%")
+                clauses.append(f'CAST("{self.columns[i]}" AS TEXT) REGEXP ?')
+                params.append(val)
 
         if not self.is_search_placeholder_active:
             global_val = self.global_search_var.get().strip()
             if global_val:
-                global_clauses = [f'CAST("{col}" AS TEXT) LIKE ?' for col in self.columns]
+                global_clauses = [f'CAST("{col}" AS TEXT) REGEXP ?' for col in self.columns]
                 clauses.append("(" + " OR ".join(global_clauses) + ")")
-                params.extend([f"%{global_val}%"] * len(self.columns))
+                params.extend([global_val] * len(self.columns))
                 
         where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         
@@ -435,15 +552,10 @@ class SQLiteViewer(ctk.CTk):
         if col_index is None: return
         checkbox = "☑" if col_index in self.selected_columns else "☐"
         
-        # Größeres Häkchen / Auswahlbox
         self.header.create_text(x + self.CHECKBOX_WIDTH / 2, self.HEADER_TOP / 2, text=checkbox, fill=self.accent_color if checkbox == "☑" else self.fg, anchor="center", font=("Segoe UI Symbol", 18), tags=(f"header_col_{col_index}", f"header_cb_{col_index}"))
-        
-        # Größerer Spaltenname (Schriftgröße 13 statt 11, fett)
         self.header.create_text(x + self.CHECKBOX_WIDTH + 6, self.HEADER_TOP / 2, text=title, fill=self.fg, anchor="w", font=("Segoe UI", 13, "bold"))
-        
         self.header.create_rectangle(x, self.HEADER_TOP, x + width, self.HEADER_HEIGHT, fill=self.header_bg, outline=self.border)
         
-        # Größeres Filter-Eingabefeld (Schriftgröße 12 statt 10)
         entry = tk.Entry(self.header, relief="flat", bd=0, bg=self.filter_field, fg=self.placeholder, insertbackground=self.fg, selectbackground=self.selected_bg, font=("Segoe UI", 12, "italic"))
         
         current_val = self.filter_vars[col_index].get()
@@ -480,7 +592,6 @@ class SQLiteViewer(ctk.CTk):
         entry.bind("<FocusIn>", focus_in); entry.bind("<FocusOut>", focus_out); entry.bind("<KeyRelease>", key_release)
         entry.bind("<ButtonPress-1>", self._header_press, add="+"); entry.bind("<B1-Motion>", self._header_drag, add="+"); entry.bind("<ButtonRelease-1>", self._header_release, add="+")
         
-        # Eingabefeld in der Höhe an die neue Header-Größe angepasst (30px hoch)
         self.header.create_window(x + 5, self.HEADER_TOP + 3, window=entry, width=max(30, width - 10), height=30, anchor="nw")
         self.filter_entries.append(entry)
 
