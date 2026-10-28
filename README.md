@@ -52,7 +52,7 @@ https://github.com/ScarfacePalmer/SQLite-Explorer/releases/download/v1.0/SQLite-
 ## License
 This project is open source and licensed under the MIT License.
 
-Developed by **ScarfacePalmer** (2026).
+Developed by **https://buymeacoffee.com/scarfacepalmer**
 
 ---
 ---
@@ -111,4 +111,4 @@ https://github.com/ScarfacePalmer/SQLite-Explorer/releases/download/v1.0/SQLite-
 ## Lizenz
 Dieses Projekt ist Open Source und steht unter der MIT-Lizenz.
 
-Entwickelt von **ScarfacePalmer** (2026).
+Entwickelt von **https://buymeacoffee.com/scarfacepalmer**
