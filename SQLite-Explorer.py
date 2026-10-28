@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import sqlite3
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -12,17 +13,27 @@ ctk.set_default_color_theme("blue")
 
 class SQLiteViewer(ctk.CTk):
     ROW_HEIGHT = 35  
-    HEADER_TOP = 32
-    HEADER_HEIGHT = 65
+    HEADER_TOP = 35  # Etwas mehr Platz für die größere Schrift
+    HEADER_HEIGHT = 70  # Gesamthöhe des Headers angepasst
     CHECKBOX_WIDTH = 48
     MIN_COL_WIDTH = 85
     MAX_COL_WIDTH = 500
 
     def __init__(self):
         super().__init__()
-        self.title("SQLite Explore-by ScarfacePalmer")
+        self.title("SQLite-Explorer by ScarfacePalmer")
         self.geometry("1500x880")
         self.minsize(950, 550)
+
+        self.state("zoomed")
+        
+        try:
+            base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            icon_path = os.path.join(base_path, "SQLite-Explorer_icon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Konnte Fenster-Icon nicht laden: {e}")
 
         self.accent_color = "#008080"
         self.accent_hover = "#006666"
@@ -43,7 +54,7 @@ class SQLiteViewer(ctk.CTk):
         self.current_lang = "DE"
         self.translations = {
             "DE": {
-                "title": "SQLite Viewer", "open_db": "📂 Datenbank öffnen", "open_sql": "📄 SQL-Dump öffnen",
+                "open_db": "📂 Datenbank öffnen", "open_sql": "📄 SQL-Dump öffnen",
                 "table_lbl": "Tabelle:", "refresh": "⟳ Aktualisieren", "all_rows": "Alle Zeilen",
                 "all_cols": "Alle Spalten", "copy_sel": "📋 Auswahl kopieren", "export_sel": "📊 Exportieren",
                 "ready": "Bereit", "db_dialog_title": "SQLite-Datenbank öffnen", "db_types": "SQLite Datenbanken",
@@ -51,7 +62,7 @@ class SQLiteViewer(ctk.CTk):
                 "open_err": "Datenbank konnte nicht geöffnet werden", "sql_err": "SQL-Dump konnte nicht geladen werden",
                 "sql_decode_err": "Der SQL-Dump konnte nicht als Text gelesen werden.", "no_tables_title": "Keine Tabellen",
                 "no_tables_msg": "Keine normalen SQLite-Tabellen gefunden.", "load_table_err": "Tabelle konnte nicht geladen werden",
-                "filter_placeholder": "Filtern", "rows_visible": "{visible} von {total} Zeilen sichtbar",
+                "filter_placeholder": "Filtern", 
                 "copied_cell": "Zelleninhalt in die Zwischenablage kopiert", "no_rows_sel_title": "Keine Zeilen ausgewählt",
                 "no_rows_sel_msg": "Bitte mindestens eine Zeile auswählen.", "no_cols_sel_title": "Keine Spalten ausgewählt",
                 "no_cols_sel_msg": "Bitte mindestens eine Spalte auswählen.", "no_visible_title": "Keine sichtbaren Zeilen",
@@ -59,10 +70,12 @@ class SQLiteViewer(ctk.CTk):
                 "copied_status": "{rows} Zeilen × {cols} Spalten kopiert", "export_success": "Erfolgreich exportiert nach {filename}",
                 "info_str": "{rows} Zeilen · {cols} Spalten", "no_db": "Keine Datenbank geöffnet",
                 "selection_info": "Zeilen: {rows}   Spalten: {cols}/{total_cols}",
+                "status_selection": "Auswahl: {vals} Werte ({rows} Zeilen × {cols} Spalten)",
+                "status_ready": "Bereit", "status_nodb": "Keine Datenbank geöffnet",
                 "search_ph": "Suche", "reset_filter": "↺ Filter zurücksetzen"
             },
             "EN": {
-                "title": "SQLite Viewer", "open_db": "📂 Open Database", "open_sql": "📄 Open SQL Dump",
+                "open_db": "📂 Open Database", "open_sql": "📄 Open SQL Dump",
                 "table_lbl": "Table:", "refresh": "⟳ Refresh", "all_rows": "All Rows",
                 "all_cols": "All Columns", "copy_sel": "📋 Copy Selection", "export_sel": "📊 Export Selection",
                 "ready": "Ready", "db_dialog_title": "Open SQLite Database", "db_types": "SQLite Databases",
@@ -70,7 +83,7 @@ class SQLiteViewer(ctk.CTk):
                 "open_err": "Database could not be opened", "sql_err": "SQL Dump could not be loaded",
                 "sql_decode_err": "The SQL dump could not be read as text.", "no_tables_title": "No Tables",
                 "no_tables_msg": "No normal SQLite tables found.", "load_table_err": "Table could not be loaded",
-                "filter_placeholder": "Filter", "rows_visible": "{visible} of {total} rows visible",
+                "filter_placeholder": "Filter", 
                 "copied_cell": "Cell content copied to clipboard", "no_rows_sel_title": "No rows selected",
                 "no_rows_sel_msg": "Please select at least one row.", "no_cols_sel_title": "No columns selected",
                 "no_cols_sel_msg": "Please select at least one column.", "no_visible_title": "No visible rows",
@@ -78,6 +91,8 @@ class SQLiteViewer(ctk.CTk):
                 "copied_status": "{rows} rows × {cols} columns copied", "export_success": "Successfully exported to {filename}",
                 "info_str": "{rows} rows · {cols} columns", "no_db": "No database opened",
                 "selection_info": "Rows: {rows}   Columns: {cols}/{total_cols}",
+                "status_selection": "Selection: {vals} values ({rows} rows × {cols} columns)",
+                "status_ready": "Ready", "status_nodb": "No database opened",
                 "search_ph": "Search", "reset_filter": "↺ Reset Filter"
             }
         }
@@ -174,7 +189,7 @@ class SQLiteViewer(ctk.CTk):
         self.status_frame = ctk.CTkFrame(self, height=45, corner_radius=0, fg_color="transparent")
         self.status_frame.pack(fill="x", side="bottom", padx=15, pady=5)
 
-        self.status_var = tk.StringVar(value=self._get_txt("ready"))
+        self.status_var = tk.StringVar(value=self._get_txt("status_ready"))
         self.lbl_status = ctk.CTkLabel(self.status_frame, textvariable=self.status_var, anchor="w")
         self.lbl_status.pack(side="left", fill="x", expand=True)
 
@@ -223,7 +238,6 @@ class SQLiteViewer(ctk.CTk):
 
     def _change_language(self, choice):
         self.current_lang = choice
-        self.title(self._get_txt("title"))
         self.btn_open_db.configure(text=self._get_txt("open_db"))
         self.btn_open_sql.configure(text=self._get_txt("open_sql"))
         self.lbl_table.configure(text=self._get_txt("table_lbl"))
@@ -232,15 +246,20 @@ class SQLiteViewer(ctk.CTk):
         self.btn_export_sel.configure(text=self._get_txt("export_sel"))
         self.btn_reset_filter.configure(text=self._get_txt("reset_filter"))
         
+        chk_r = "☑" if self.selected_row_ids else "☐"
+        chk_c = "☑" if self.selected_columns else "☐"
+        self.rows_toggle.configure(text=chk_r + " " + self._get_txt("all_rows"))
+        self.columns_toggle.configure(text=chk_c + " " + self._get_txt("all_cols"))
+        
         if self.is_search_placeholder_active:
             self._apply_search_placeholder()
 
         if self.columns: 
+            self._draw_header()
             self._refresh_view()
         else: 
-            self.status_var.set(self._get_txt("ready"))
+            self.status_var.set(self._get_txt("status_ready"))
         self._update_info()
-        self._draw_header()
 
     def _apply_theme(self):
         is_dark = ctk.get_appearance_mode() == "Dark"
@@ -253,7 +272,8 @@ class SQLiteViewer(ctk.CTk):
         self.configure(fg_color=self.bg)
         self.header.configure(bg=self.header_bg, highlightbackground=self.border)
         self.body.configure(bg=self.field, highlightbackground=self.border)
-        self._draw_header()
+        if self.columns:
+            self._draw_header()
         self._redraw_visible_viewport()
         if self.is_search_placeholder_active:
             self.search_entry.configure(text_color=self.placeholder)
@@ -331,6 +351,7 @@ class SQLiteViewer(ctk.CTk):
             sample_rows = cur.execute(f"SELECT * FROM {qname} LIMIT 50").fetchall()
             self.column_widths = {i: self._initial_width(i, sample_rows) for i in range(len(self.columns))}
             
+            self._draw_header()
             self._refresh_view()
         except Exception as exc: 
             messagebox.showerror(self._get_txt("load_table_err"), str(exc))
@@ -345,13 +366,7 @@ class SQLiteViewer(ctk.CTk):
         self._apply_search_placeholder()
         for var in self.filter_vars:
             var.set("")
-        for entry in self.filter_entries:
-            try:
-                entry.delete(0, "end")
-                entry.insert(0, self._get_txt("filter_placeholder"))
-                entry.configure(fg=self.placeholder, font=("Segoe UI", 10, "italic"))
-            except:
-                pass
+        self._draw_header()
         self._refresh_view()
 
     def _build_query(self, count_only=False):
@@ -387,7 +402,6 @@ class SQLiteViewer(ctk.CTk):
         count_sql, params = self._build_query(count_only=True)
         self.total_rows = cur.execute(count_sql, params).fetchone()[0]
         
-        self._draw_header()
         self._redraw_visible_viewport()
         self._update_info()
 
@@ -420,25 +434,54 @@ class SQLiteViewer(ctk.CTk):
         self.header.create_rectangle(x, 0, x + width, self.HEADER_TOP, fill=self.header_bg, outline=self.border)
         if col_index is None: return
         checkbox = "☑" if col_index in self.selected_columns else "☐"
-        self.header.create_text(x + self.CHECKBOX_WIDTH / 2, self.HEADER_TOP / 2, text=checkbox, fill=self.accent_color if checkbox == "☑" else self.fg, anchor="center", font=("Segoe UI Symbol", 16), tags=(f"header_col_{col_index}", f"header_cb_{col_index}"))
-        self.header.create_text(x + self.CHECKBOX_WIDTH + 6, self.HEADER_TOP / 2, text=title, fill=self.fg, anchor="w", font=("Segoe UI", 11, "bold"))
+        
+        # Größeres Häkchen / Auswahlbox
+        self.header.create_text(x + self.CHECKBOX_WIDTH / 2, self.HEADER_TOP / 2, text=checkbox, fill=self.accent_color if checkbox == "☑" else self.fg, anchor="center", font=("Segoe UI Symbol", 18), tags=(f"header_col_{col_index}", f"header_cb_{col_index}"))
+        
+        # Größerer Spaltenname (Schriftgröße 13 statt 11, fett)
+        self.header.create_text(x + self.CHECKBOX_WIDTH + 6, self.HEADER_TOP / 2, text=title, fill=self.fg, anchor="w", font=("Segoe UI", 13, "bold"))
+        
         self.header.create_rectangle(x, self.HEADER_TOP, x + width, self.HEADER_HEIGHT, fill=self.header_bg, outline=self.border)
-        entry = tk.Entry(self.header, relief="flat", bd=0, bg=self.filter_field, fg=self.placeholder, insertbackground=self.fg, selectbackground=self.selected_bg, font=("Segoe UI", 10, "italic"))
-        entry.insert(0, self._get_txt("filter_placeholder"))
+        
+        # Größeres Filter-Eingabefeld (Schriftgröße 12 statt 10)
+        entry = tk.Entry(self.header, relief="flat", bd=0, bg=self.filter_field, fg=self.placeholder, insertbackground=self.fg, selectbackground=self.selected_bg, font=("Segoe UI", 12, "italic"))
+        
+        current_val = self.filter_vars[col_index].get()
+        if current_val:
+            entry.delete(0, "end")
+            entry.insert(0, current_val)
+            entry.configure(fg=self.fg, font=("Segoe UI", 12, "normal"))
+        else:
+            entry.insert(0, self._get_txt("filter_placeholder"))
 
         def focus_in(_e):
-            if entry.get() == self._get_txt("filter_placeholder"): entry.delete(0, "end"); entry.configure(fg=self.fg, font=("Segoe UI", 10, "normal"))
+            if entry.get() == self._get_txt("filter_placeholder"): 
+                entry.delete(0, "end")
+                entry.configure(fg=self.fg, font=("Segoe UI", 12, "normal"))
+
         def focus_out(_e, idx=col_index):
-            if not entry.get().strip(): entry.delete(0, "end"); entry.insert(0, self._get_txt("filter_placeholder")); entry.configure(fg=self.placeholder, font=("Segoe UI", 10, "italic")); self.filter_vars[idx].set("")
-            else: self.filter_vars[idx].set(entry.get())
+            if not entry.get().strip() or entry.get() == self._get_txt("filter_placeholder"): 
+                entry.delete(0, "end")
+                entry.insert(0, self._get_txt("filter_placeholder"))
+                entry.configure(fg=self.placeholder, font=("Segoe UI", 12, "italic"))
+                self.filter_vars[idx].set("")
+            else: 
+                self.filter_vars[idx].set(entry.get())
             self._refresh_view()
+
         def key_release(_e, idx=col_index):
-            self.filter_vars[idx].set("" if entry.get() == self._get_txt("filter_placeholder") else entry.get())
+            val = entry.get()
+            if val == self._get_txt("filter_placeholder"):
+                self.filter_vars[idx].set("")
+            else:
+                self.filter_vars[idx].set(val)
             self._refresh_view()
 
         entry.bind("<FocusIn>", focus_in); entry.bind("<FocusOut>", focus_out); entry.bind("<KeyRelease>", key_release)
         entry.bind("<ButtonPress-1>", self._header_press, add="+"); entry.bind("<B1-Motion>", self._header_drag, add="+"); entry.bind("<ButtonRelease-1>", self._header_release, add="+")
-        self.header.create_window(x + 5, self.HEADER_TOP + 2, window=entry, width=max(30, width - 10), height=27, anchor="nw")
+        
+        # Eingabefeld in der Höhe an die neue Header-Größe angepasst (30px hoch)
+        self.header.create_window(x + 5, self.HEADER_TOP + 3, window=entry, width=max(30, width - 10), height=30, anchor="nw")
         self.filter_entries.append(entry)
 
     def _update_header_checkboxes(self):
@@ -591,22 +634,31 @@ class SQLiteViewer(ctk.CTk):
 
         if all_ids.issubset(self.selected_row_ids):
             self.selected_row_ids.difference_update(all_ids)
+            chk = "☐ "
         else:
             self.selected_row_ids.update(all_ids)
+            chk = "☑ "
             
+        self.rows_toggle.configure(text=chk + self._get_txt("all_rows"))
         self._redraw_visible_viewport()
         self._update_info()
 
     def toggle_all_columns(self):
         all_cols = set(range(len(self.columns)))
         if not all_cols: return
-        self.selected_columns = set() if self.selected_columns == all_cols else set(all_cols)
+        if self.selected_columns == all_cols:
+            self.selected_columns = set()
+            chk = "☐ "
+        else:
+            self.selected_columns = set(all_cols)
+            chk = "☑ "
+            
+        self.columns_toggle.configure(text=chk + self._get_txt("all_cols"))
         self._update_header_checkboxes()
         self._redraw_visible_viewport()
         self._update_info()
 
     def _fetch_selected_rows_data(self):
-        """Lädt große Datenmengen in sicheren 500er-Batches, um 'too many SQL variables' zu verhindern."""
         if not self.selected_row_ids: return []
         cur = self.conn.cursor()
         qname = '"' + self.current_table.replace('"', '""') + '"'
@@ -614,7 +666,7 @@ class SQLiteViewer(ctk.CTk):
         
         id_list = list(self.selected_row_ids)
         all_rows = []
-        batch_size = 500  # Sicherer Batche-Wert unterhalb des SQLite-Limits
+        batch_size = 500  
         
         for i in range(0, len(id_list), batch_size):
             chunk = id_list[i:i + batch_size]
@@ -682,7 +734,6 @@ class SQLiteViewer(ctk.CTk):
                 col_names = ",".join([f'"{self.columns[c]}"' for c in selected_cols])
                 insert_sql = f'INSERT INTO "{self.current_table}" ({col_names}) VALUES ({placeholders});'
                 
-                # Auch beim Einfügen in Batches arbeiten, um maximale Performance zu garantieren
                 insert_data = []
                 for row in rows:
                     insert_data.append(tuple("NULL" if row[c] is None else row[c] for c in selected_cols))
@@ -716,10 +767,16 @@ class SQLiteViewer(ctk.CTk):
     def _update_info(self):
         self.selection_info.set(self._get_txt("selection_info", rows=len(self.selected_row_ids), cols=len(self.selected_columns), total_cols=len(self.columns)))
         if self.columns:
+            sel_rows = len(self.selected_row_ids)
+            sel_cols = len(self.selected_columns)
+            total_selected_values = sel_rows * sel_cols
+            
+            self.status_var.set(self._get_txt("status_selection", vals=f"{total_selected_values:,}".replace(",", "."), rows=sel_rows, cols=sel_cols))
+            
             cnt = f"{self.total_rows:,}".replace(",", ".")
-            self.status_var.set(self._get_txt("rows_visible", visible=f"{self.total_rows:,}", total=cnt).replace(",", "."))
             self.info_var.set(self._get_txt("info_str", rows=cnt, cols=len(self.columns)))
         else: 
+            self.status_var.set(self._get_txt("status_ready"))
             self.info_var.set(self._get_txt("no_db"))
 
     def _close(self):
@@ -729,4 +786,12 @@ class SQLiteViewer(ctk.CTk):
         self.destroy()
 
 if __name__ == "__main__":
-     SQLiteViewer().mainloop()
+    try:
+        import pyi_splash
+        import time
+        time.sleep(3)
+        pyi_splash.close()
+    except ImportError:
+        pass  
+
+    SQLiteViewer().mainloop()
