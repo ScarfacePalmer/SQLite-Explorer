@@ -49,15 +49,17 @@ class SQLiteViewer(ctk.CTk):
     CHECKBOX_WIDTH = 48
     MIN_COL_WIDTH = 85
     MAX_COL_WIDTH = 500
+  
 
     def __init__(self):
         super().__init__()
         self.title("SQLite-Explorer by ScarfacePalmer")
-        self.geometry("1500x880")
         self.minsize(950, 550)
 
-        self.state("zoomed")
-        
+
+        self.after(50, lambda: self.state("zoomed"))
+
+
         try:
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
             icon_path = os.path.join(base_path, "SQLite-Explorer_icon.ico")
@@ -233,13 +235,11 @@ class SQLiteViewer(ctk.CTk):
         self.btn_reset_filter = ctk.CTkButton(self.selection_bar, text=self._get_txt("reset_filter"), command=self.reset_all_filters, fg_color=("#e0e0e0", "#3a3a3a"), text_color=("#1a1a1a", "#ffffff"), border_width=1, border_color=("#b0b0b0", "#555555"), width=130)
         self.btn_reset_filter.pack(side="left", padx=5, pady=6)
 
-        # Regex On/Off Schalter (mit Türkis als Akzentfarbe)
         self.regex_switch = ctk.CTkSwitch(self.selection_bar, text=self._get_txt("regex_lbl"), command=self._on_regex_toggle, width=70, progress_color=self.accent_color, button_color=("#ffffff", "#e0e0e0"), button_hover_color=self.accent_hover)
         self.regex_switch.pack(side="left", padx=(10, 5), pady=6)
         self.regex_switch.select()
 
-        # Info Icon für Regex Erklärung (klickbar + Tooltip)
-        self.lbl_regex_info = ctk.CTkLabel(self.selection_bar, text=" ⓘ ", font=("Segoe UI", 13, "bold"), text_color=self.accent_color, cursor="arrow")
+        self.lbl_regex_info = ctk.CTkLabel(self.selection_bar, text=" ⓘ ", font=("Segoe UI", 15, "bold"), text_color=self.accent_color, cursor="arrow")
         self.lbl_regex_info.pack(side="left", padx=(0, 5), pady=6)
         ToolTip(self.lbl_regex_info, lambda: self._get_txt("regex_tooltip"))
         self.lbl_regex_info.bind("<Button-1>", lambda e: self._show_regex_help_dialog())
