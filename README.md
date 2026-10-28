@@ -43,7 +43,9 @@ pip install customtkinter pillow
 ```bash
 python sql-explorer.py
 ```
+### Or download the .exe
 
+https://github.com/ScarfacePalmer/SQLite-Explorer/releases/download/v1.0/SQLite-Explorer.exe
 
 ---
 
@@ -100,7 +102,9 @@ pip install customtkinter pillow
 ```bash
 python sql-explorer.py
 ```
+### Oder als .exe downloaden
 
+https://github.com/ScarfacePalmer/SQLite-Explorer/releases/download/v1.0/SQLite-Explorer.exe
 
 ---
 
